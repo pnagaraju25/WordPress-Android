@@ -68,7 +68,9 @@ public class Note extends Syncable {
      * Create a note using JSON from Simperium
      */
     private Note(JSONObject noteJSON) {
-        mNoteJSON = noteJSON;
+        synchronized (mSyncLock) {
+            mNoteJSON = noteJSON;
+        }
     }
 
     /**
@@ -77,7 +79,7 @@ public class Note extends Syncable {
     @Override
     public JSONObject getDiffableValue() {
         synchronized (mSyncLock) {
-            return JSONDiff.deepCopy(mNoteJSON);
+            return JSONDiff.deepCopy(getNoteJSON());
         }
     }
 
@@ -87,6 +89,12 @@ public class Note extends Syncable {
     @Override
     public String getSimperiumKey() {
         return getId();
+    }
+
+    public JSONObject getNoteJSON() {
+        synchronized (mSyncLock) {
+            return mNoteJSON;
+        }
     }
 
     public String getId() {
@@ -103,7 +111,7 @@ public class Note extends Syncable {
 
     public Boolean isCommentType() {
         synchronized (mSyncLock) {
-            return (isAutomattcherType() && JSONUtils.queryJSON(mNoteJSON, "meta.ids.comment", -1) != -1) ||
+            return (isAutomattcherType() && JSONUtils.queryJSON(getNoteJSON(), "meta.ids.comment", -1) != -1) ||
                     isType(NOTE_COMMENT_TYPE);
         }
     }
@@ -127,7 +135,7 @@ public class Note extends Syncable {
     private JSONObject getSubject() {
         try {
             synchronized (mSyncLock) {
-                JSONArray subjectArray = mNoteJSON.getJSONArray("subject");
+                JSONArray subjectArray = getNoteJSON().getJSONArray("subject");
                 if (subjectArray.length() > 0) {
                     return subjectArray.getJSONObject(0);
                 }
@@ -153,7 +161,7 @@ public class Note extends Syncable {
 
     private String getCommentSubject() {
         synchronized (mSyncLock) {
-            JSONArray subjectArray = mNoteJSON.optJSONArray("subject");
+            JSONArray subjectArray = getNoteJSON().optJSONArray("subject");
             if (subjectArray != null) {
                 String commentSubject = JSONUtils.queryJSON(subjectArray, "subject[1].text", "");
 
@@ -223,7 +231,7 @@ public class Note extends Syncable {
     public void markAsRead() {
         try {
             synchronized (mSyncLock) {
-                mNoteJSON.put("read", 1);
+                getNoteJSON().put("read", 1);
             }
         } catch (JSONException e) {
             Log.e(TAG, "Unable to update note read property", e);
@@ -242,7 +250,7 @@ public class Note extends Syncable {
     public JSONArray getBody() {
         try {
             synchronized (mSyncLock) {
-                return mNoteJSON.getJSONArray("body");
+                return getNoteJSON().getJSONArray("body");
             }
         } catch (JSONException e) {
             return new JSONArray();
@@ -338,8 +346,8 @@ public class Note extends Syncable {
      */
     private <U> U queryJSON(String query, U defaultObject) {
         synchronized (mSyncLock) {
-            if (mNoteJSON == null) return defaultObject;
-            return JSONUtils.queryJSON(mNoteJSON, query, defaultObject);
+            if (getNoteJSON() == null) return defaultObject;
+            return JSONUtils.queryJSON(getNoteJSON(), query, defaultObject);
         }
     }
 
@@ -418,7 +426,7 @@ public class Note extends Syncable {
 
     public JSONArray getHeader() {
         synchronized (mSyncLock) {
-            return mNoteJSON.optJSONArray("header");
+            return getNoteJSON().optJSONArray("header");
         }
     }
 
@@ -474,7 +482,7 @@ public class Note extends Syncable {
 
             @Override
             public List<Index> index(Note note) {
-                List<Index> indexes = new ArrayList<Index>();
+                List<Index> indexes = new ArrayList<>();
                 try {
                     indexes.add(new Index(TIMESTAMP_INDEX, note.getTimestamp()));
                 } catch (NumberFormatException e) {
